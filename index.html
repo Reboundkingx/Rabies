@@ -206,17 +206,21 @@
 
     <script>
         // --- GEMINI API INTEGRATION ---
-        const apiKey = ""; // System provided key (leave empty)
+        // ⚠️ SECURITY NOTE: This key is visible in the source code. 
+        // Only use this for testing/demos. Do not share this file publicly on the web without restrictions.
+        const apiKey = "AIzaSyDzvbHNZUKrUJ9R98qHkhZPAjST25IfzOM"; 
         
         async function callGemini(prompt, systemInstruction = "") {
+            // Logic simplified: We use the hardcoded key directly.
+            // If you ever want to remove the key from the code, delete the string above 
+            // and the app will automatically ask the user for a key again.
+            
             let keyToUse = apiKey;
             
-            // 1. Check if system key is empty, if so, check LocalStorage
+            // Fallback: If hardcoded key is empty, check storage or ask user
             if (!keyToUse) {
                 keyToUse = localStorage.getItem("gemini_api_key");
             }
-
-            // 2. If still empty, try to ask ONCE
             if (!keyToUse) {
                 const userKey = prompt("🐶 Dr. Doggy needs a voice!\n\nPlease paste your Google Gemini API Key below.\n(Get one at aistudio.google.com)");
                 if (userKey) {
