@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sarawak Vet Squad: Vaccine Vantage</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Markdown parser for AI responses -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@700&display=swap');
+        
+        body {
+            font-family: 'Nunito', sans-serif;
+            overscroll-behavior: none;
+            touch-action: none;
+            background-color: #111827; 
+        }
+
+        h1, .arcade-text {
+            font-family: 'Bangers', cursive;
+            letter-spacing: 2px;
+        }
+
+        .scanlines {
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.1) 50%,
+                rgba(0,0,0,0.1)
+            );
+            background-size: 100% 4px;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            z-index: 30;
+        }
+
+        .glow-text {
+            text-shadow: 0 0 10px #facc15, 0 0 20px #ca8a04;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        .floating { animation: float 3s ease-in-out infinite; }
+
+        /* Chat Bubble Styles */
+        .chat-bubble {
+            max-width: 80%;
+            margin-bottom: 10px;
+            padding: 10px 15px;
+            border-radius: 15px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+        .user-bubble {
+            background-color: #3b82f6;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 2px;
+        }
+        .ai-bubble {
+            background-color: #374151;
+            color: #e5e7eb;
+            align-self: flex-start;
+            border-bottom-left-radius: 2px;
+            border: 1px solid #4b5563;
+        }
+        .typing-dot {
+            animation: typing 1.4s infinite ease-in-out both;
+        }
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="h-screen w-full overflow-hidden text-white select-none">
+
+    <div class="scanlines"></div>
+
+    <!-- Main Menu -->
+    <div id="mainMenu" class="absolute inset-0 z-50 bg-gray-900 flex flex-col items-center justify-center p-6 text-center">
+        <div class="floating mb-4 text-8xl">👮‍♂️💉🐕</div>
+        <h1 class="text-5xl md:text-7xl text-yellow-400 mb-2 glow-text">SARAWAK<br>VET SQUAD</h1>
+        <p class="text-blue-300 mb-8 text-xl font-bold tracking-wider">OPERATION: ZERO RABIES</p>
+        
+        <div class="space-y-4 w-full max-w-xs relative z-50">
+            <button onclick="startArcadeGame()" class="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:scale-105 transition transform text-white text-2xl font-bold py-4 rounded-xl shadow-[0_4px_0_rgb(21,128,61)] active:shadow-none active:translate-y-1">
+                DEPLOY TEAM (GAME)
+            </button>
+            <button onclick="startFullQuiz()" class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:scale-105 transition transform text-white text-xl font-bold py-4 rounded-xl shadow-[0_4px_0_rgb(30,58,138)] active:shadow-none active:translate-y-1">
+                TRAINING QUIZ (FULL)
+            </button>
+            <!-- GEMINI FEATURE 1 -->
+            <button onclick="openDrDoggyChat()" class="w-full bg-gradient-to-r from-purple-500 to-pink-600 hover:scale-105 transition transform text-white text-xl font-bold py-4 rounded-xl shadow-[0_4px_0_rgb(147,51,234)] active:shadow-none active:translate-y-1 flex items-center justify-center gap-2">
+                <span>✨</span> ASK DR. DOGGY
+            </button>
+        </div>
+    </div>
+
+    <!-- Game HUD -->
+    <div id="gameHUD" class="absolute top-0 left-0 w-full p-4 flex justify-between z-20 hidden pointer-events-none">
+        <div class="flex flex-col">
+            <span class="arcade-text text-yellow-400 text-xl">SCORE</span>
+            <span id="scoreDisplay" class="text-3xl font-black leading-none">0</span>
+        </div>
+        <div id="powerupStatus" class="absolute top-16 left-4 text-blue-400 font-bold text-sm opacity-0 transition-opacity duration-300">
+            RAPID FIRE ACTIVE!
+        </div>
+        <div class="flex flex-col items-end">
+             <span class="arcade-text text-red-400 text-xl">HEALTH</span>
+             <div id="livesDisplay" class="text-3xl tracking-widest">❤️❤️❤️</div>
+        </div>
+    </div>
+
+    <!-- Canvas Layer -->
+    <canvas id="gameCanvas" class="block w-full h-full bg-gray-900 hidden"></canvas>
+
+    <!-- Universal Modal (Quiz, Game Over) -->
+    <div id="universalModal" class="absolute inset-0 z-50 bg-black/95 hidden flex flex-col items-center justify-center p-4">
+        <div class="bg-gray-800 border-4 border-blue-500 text-white rounded-2xl p-6 max-w-md w-full shadow-2xl text-center relative">
+            
+            <!-- Badge -->
+            <div id="modalBadge" class="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-blue-600 px-6 py-2 rounded-full font-bold shadow-lg border-2 border-white hidden">
+                BADGE
+            </div>
+            
+            <h2 id="modalTitle" class="mt-6 text-3xl font-bold mb-2 text-yellow-400 arcade-text">TITLE</h2>
+            
+            <!-- Quiz Content -->
+            <div id="quizContainer" class="hidden">
+                <div class="mb-2 text-blue-300 text-sm font-bold tracking-widest">QUESTION <span id="qIndex">1</span>/<span id="qTotal">8</span></div>
+                <div class="h-2 w-full bg-gray-700 rounded-full mb-6">
+                    <div id="progressBar" class="h-full bg-blue-500 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                
+                <p id="quizQuestion" class="text-lg mb-6 font-semibold">Question text...</p>
+                <div id="quizOptions" class="grid grid-cols-1 gap-3 mb-4"></div>
+                <div id="quizFeedback" class="hidden p-3 rounded bg-gray-700 font-bold text-sm mb-4"></div>
+            </div>
+
+            <!-- Results Content -->
+            <div id="resultsContainer" class="hidden">
+                <p id="resultSubtitle" class="text-gray-300 text-xl mb-2">FINAL SCORE</p>
+                <p id="resultBigText" class="text-6xl font-black text-yellow-400 mb-4 arcade-text">0</p>
+                <!-- RESTORED MISSING ELEMENT -->
+                <p id="resultMessage" class="text-sm text-gray-400 mb-4 font-bold text-blue-300">Status Check...</p>
+                
+                <!-- GEMINI FEATURE 2: AI DEBRIEF -->
+                <div class="bg-gray-700/50 p-4 rounded-xl border border-gray-600 mb-6 text-left">
+                    <p class="text-xs text-purple-400 font-bold mb-1 uppercase flex items-center gap-1">
+                        <span>✨</span> HQ Mission Debrief
+                    </p>
+                    <div id="aiDebriefContent" class="text-sm text-gray-300 italic min-h-[60px]">
+                        Connecting to HQ...
+                    </div>
+                </div>
+            </div>
+            
+            <button id="actionBtn" class="hidden w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl shadow-lg transition">
+                CONTINUE
+            </button>
+        </div>
+    </div>
+
+    <!-- Dr. Doggy Chat Modal -->
+    <div id="chatModal" class="absolute inset-0 z-[60] bg-black/90 hidden flex flex-col items-center justify-center p-4">
+        <div class="bg-gray-800 border-4 border-purple-500 w-full max-w-md h-[80vh] rounded-2xl flex flex-col overflow-hidden shadow-2xl">
+            <!-- Header -->
+            <div class="bg-purple-600 p-4 flex justify-between items-center shadow-md z-10">
+                <div class="flex items-center gap-3">
+                    <div class="bg-white p-2 rounded-full text-2xl">🐶</div>
+                    <div>
+                        <h3 class="font-bold text-white text-lg leading-none">Dr. Doggy</h3>
+                        <span class="text-purple-200 text-xs">Sarawak Rabies Expert</span>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="manualSetKey()" class="text-xs bg-purple-800 hover:bg-purple-900 px-2 py-1 rounded text-purple-200 border border-purple-400">🔑 KEY</button>
+                    <button onclick="closeChat()" class="text-white hover:bg-purple-700 px-2 rounded-lg transition font-bold text-xl">✕</button>
+                </div>
+            </div>
+            
+            <!-- Chat Area -->
+            <div id="chatHistory" class="flex-1 p-4 overflow-y-auto flex flex-col bg-gray-900/50">
+                <div class="ai-bubble chat-bubble">
+                    Woof! I'm Dr. Doggy. 🐕<br>Ask me anything about Rabies prevention, symptoms, or where to get vaccinated in Sarawak!
+                </div>
+            </div>
+            
+            <!-- Input Area -->
+            <div class="p-4 bg-gray-800 border-t border-gray-700">
+                <div class="flex gap-2">
+                    <input type="text" id="chatInput" class="flex-1 bg-gray-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Ask about Rabies..." onkeypress="if(event.key==='Enter') sendChatMessage()">
+                    <button onclick="sendChatMessage()" class="bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-4 py-2 transition font-bold">
+                        SEND
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- GEMINI API INTEGRATION ---
+        const apiKey = ""; // System provided key (leave empty)
+        
+        async function callGemini(prompt, systemInstruction = "") {
+            let keyToUse = apiKey;
+            
+            // 1. Check if system key is empty, if so, check LocalStorage
+            if (!keyToUse) {
+                keyToUse = localStorage.getItem("gemini_api_key");
+            }
+
+            // 2. If still empty, try to ask ONCE
+            if (!keyToUse) {
+                const userKey = prompt("🐶 Dr. Doggy needs a voice!\n\nPlease paste your Google Gemini API Key below.\n(Get one at aistudio.google.com)");
+                if (userKey) {
+                    keyToUse = userKey.trim();
+                    localStorage.setItem("gemini_api_key", keyToUse);
+                } else {
+                    return "Error: API Key is missing. Click the 'KEY' button top-right to set it.";
+                }
+            }
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${keyToUse}`;
+            
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                systemInstruction: { parts: [{ text: systemInstruction }] }
+            };
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                    if (response.status === 400 || response.status === 403) {
+                        return "Error: Invalid API Key. Please click 'KEY' to update it.";
+                    }
+                    throw new Error(`API Error: ${response.status}`);
+                }
+                const data = await response.json();
+                return data.candidates?.[0]?.content?.parts?.[0]?.text || "No response from HQ.";
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                return "Connection lost. Please check internet.";
+            }
+        }
+
+        function manualSetKey() {
+            const current = localStorage.getItem("gemini_api_key") || "";
+            const newKey = prompt("Enter/Update your Gemini API Key:", current);
+            if (newKey !== null) {
+                localStorage.setItem("gemini_api_key", newKey.trim());
+                alert("Key updated! Try asking Dr. Doggy again.");
+            }
+        }
+
+        // --- Config & Assets ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        const SPRITES = {
+            player: '👮‍♂️', vaccine: '💉', enemy: '🐕', cured: '🥰',
+            soap: '🧼', shield: '🛡️', power: '⚡'
+        };
+
+        // Question Bank
+        const ALL_QUESTIONS = [
+            { q: "What is the '15 Minute Rule' for dog bites?", options: ["Sleep for 15 mins", "Wash wound with soap/water", "Run for 15 mins", "Wrap wound for 15 mins"], correct: 1, info: "Washing the wound with soap and running water for 15 minutes is crucial!" },
+            { q: "Which area in Sarawak declared the first outbreak in 2017?", options: ["Kuching", "Serian", "Miri", "Sibu"], correct: 1, info: "It started in Serian before spreading." },
+            { q: "What is the main carrier of Rabies in Sarawak?", options: ["Monkeys", "Bats", "Dogs", "Cats"], correct: 2, info: "99% of human cases are caused by dog bites." },
+            { q: "Is Rabies curable after symptoms appear?", options: ["Yes, with pills", "No, it is almost 100% fatal", "Yes, with surgery", "Maybe"], correct: 1, info: "Once symptoms appear, it is fatal. Prevention is key!" },
+            { q: "How often should dogs be vaccinated for Rabies?", options: ["Once only", "Every year (Annually)", "Every 10 years", "Never"], correct: 1, info: "Annual vaccination is required to maintain immunity." },
+            { q: "What is a common sign of a rabid dog?", options: ["Purring", "Aggression & Drooling", "Sleepiness", "Eating Grass"], correct: 1, info: "Aggression, fear of water, and excessive saliva are red flags." },
+            { q: "Which government body handles animal vaccination in Sarawak?", options: ["JPJ", "DVS (Vet Services)", "Fire Department", "Police"], correct: 1, info: "Department of Veterinary Services (DVS) leads the campaign." },
+            { q: "Can cats get Rabies too?", options: ["No", "Yes, all mammals can", "Only if they eat dogs", "Only in West Malaysia"], correct: 1, info: "Yes! Cats, dogs, and humans are all susceptible mammals." }
+        ];
+
+        // --- State Management ---
+        let appMode = 'menu'; // menu, arcade, quiz
+        
+        // Arcade State
+        let arcadeState = {
+            score: 0, lives: 3, frame: 0, lastTime: 0, spawnRate: 60, difficulty: 1
+        };
+        let player = { x: 0, y: 0, size: 40, weaponLevel: 1, shield: false };
+        let bullets = [], enemies = [], particles = [], powerups = [], texts = [];
+        let input = { x: 0, y: 0, active: false };
+
+        // Quiz State
+        let quizState = {
+            questions: [], currentIdx: 0, score: 0
+        };
+
+        // --- Initialization ---
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // --- ARCADE MODE LOGIC ---
+
+        function startArcadeGame() {
+            appMode = 'arcade';
+            document.getElementById('mainMenu').classList.add('hidden');
+            document.getElementById('gameHUD').classList.remove('hidden');
+            canvas.classList.remove('hidden');
+            
+            // Reset
+            arcadeState = { score: 0, lives: 3, frame: 0, lastTime: performance.now(), spawnRate: 60, difficulty: 1 };
+            player = { x: canvas.width/2, y: canvas.height - 100, size: 35, weaponLevel: 1, shield: false };
+            bullets = []; enemies = []; particles = []; powerups = []; texts = [];
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        function gameLoop(timestamp) {
+            if (appMode !== 'arcade') return;
+            const dt = (timestamp - arcadeState.lastTime) / 16.67;
+            arcadeState.lastTime = timestamp;
+            arcadeState.frame++;
+
+            updateArcade(dt);
+            drawArcade();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function updateArcade(dt) {
+            // Input
+            if (input.active) {
+                player.x += (input.x - player.x) * 0.15 * dt;
+                player.y += (input.y - player.y) * 0.15 * dt;
+            }
+            player.x = Math.max(player.size, Math.min(canvas.width - player.size, player.x));
+            player.y = Math.max(player.size, Math.min(canvas.height - player.size, player.y));
+
+            // Auto Shoot
+            if (arcadeState.frame % (player.weaponLevel > 1 ? 8 : 15) === 0) shoot();
+
+            // Spawn
+            if (arcadeState.frame % Math.floor(arcadeState.spawnRate) === 0) spawnEnemy();
+            if (arcadeState.frame % 600 === 0 && arcadeState.spawnRate > 20) {
+                arcadeState.spawnRate -= 2;
+                arcadeState.difficulty += 0.1;
+            }
+
+            // Bullets
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                let b = bullets[i];
+                b.y -= 15 * dt;
+                if (b.y < -50) bullets.splice(i, 1);
+            }
+
+            // Enemies
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                let e = enemies[i];
+                e.y += e.speed * dt;
+                e.x += Math.sin(e.y * 0.05) * 2 * dt;
+
+                if (!e.cured) {
+                    // Hit by Bullet
+                    for (let j = bullets.length - 1; j >= 0; j--) {
+                        if (dist(bullets[j].x, bullets[j].y, e.x, e.y) < e.size + 10) {
+                            bullets.splice(j, 1);
+                            cureEnemy(e);
+                            break;
+                        }
+                    }
+                    // Hit Player
+                    if (dist(player.x, player.y, e.x, e.y) < player.size + e.size - 10) {
+                        if (player.shield) {
+                            player.shield = false;
+                            e.cured = true;
+                            spawnParticles(e.x, e.y, '#3b82f6', 10);
+                            playSound('shield_break');
+                        } else {
+                            playerHit();
+                        }
+                    }
+                }
+                if (e.y > canvas.height + 50) enemies.splice(i, 1);
+            }
+
+            // Powerups
+            for (let i = powerups.length - 1; i >= 0; i--) {
+                let p = powerups[i];
+                p.y += 4 * dt;
+                if (dist(player.x, player.y, p.x, p.y) < player.size + 20) {
+                    applyPowerup(p.type);
+                    powerups.splice(i, 1);
+                } else if (p.y > canvas.height) powerups.splice(i, 1);
+            }
+
+            // Particles & Text
+            particles.forEach((p, i) => {
+                p.x += p.vx * dt; p.y += p.vy * dt; p.life -= 0.02 * dt;
+                if(p.life <= 0) particles.splice(i, 1);
+            });
+            texts.forEach((t, i) => {
+                t.y -= 1 * dt; t.life -= 0.015 * dt;
+                if(t.life <= 0) texts.splice(i, 1);
+            });
+        }
+
+        function drawArcade() {
+            ctx.fillStyle = '#111827';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Grid
+            ctx.strokeStyle = 'rgba(59, 130, 246, 0.1)';
+            ctx.lineWidth = 2;
+            const gridSize = 40;
+            const offset = (arcadeState.frame * 2) % gridSize;
+            ctx.beginPath();
+            for (let x = 0; x <= canvas.width; x += gridSize) { ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); }
+            for (let y = offset; y <= canvas.height; y += gridSize) { ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); }
+            ctx.stroke();
+
+            // Player
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            if (player.shield) {
+                ctx.beginPath(); ctx.arc(0, 0, player.size+10, 0, Math.PI*2);
+                ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 3; ctx.setLineDash([5,5]);
+                ctx.rotate(arcadeState.frame * 0.05); ctx.stroke();
+            }
+            ctx.font = '40px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillStyle = "white";
+            ctx.fillText(SPRITES.player, 0, 0);
+            ctx.restore();
+
+            // Entities
+            ctx.textAlign = 'center';
+            ctx.font = '20px Arial';
+            bullets.forEach(b => ctx.fillText(SPRITES.vaccine, b.x, b.y));
+            
+            enemies.forEach(e => {
+                if(e.cured) {
+                    ctx.globalAlpha = 0.6; ctx.font = `${e.size}px Arial`;
+                    ctx.fillText(SPRITES.cured, e.x, e.y);
+                } else {
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.5)';
+                    ctx.beginPath(); ctx.arc(e.x, e.y, e.size/1.5, 0, Math.PI*2); ctx.fill();
+                    ctx.globalAlpha = 1; ctx.font = `${e.size}px Arial`;
+                    ctx.fillText(SPRITES.enemy, e.x, e.y);
+                }
+                ctx.globalAlpha = 1;
+            });
+
+            powerups.forEach(p => {
+                ctx.font = '30px Arial';
+                ctx.fillText(p.type === 'rapid' ? SPRITES.power : SPRITES.shield, p.x, p.y);
+            });
+
+            // Particles & Text
+            particles.forEach(p => {
+                ctx.globalAlpha = p.life; ctx.fillStyle = p.color;
+                ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill();
+            });
+            texts.forEach(t => {
+                ctx.globalAlpha = t.life; ctx.fillStyle = t.color;
+                ctx.font = 'bold 20px Nunito';
+                ctx.fillText(t.text, t.x, t.y);
+            });
+            ctx.globalAlpha = 1;
+        }
+
+        // --- Arcade Helpers ---
+        function dist(x1, y1, x2, y2) { return Math.hypot(x2-x1, y2-y1); }
+        
+        function shoot() {
+            playSound('shoot');
+            if (player.weaponLevel === 1) bullets.push({x: player.x, y: player.y-20});
+            else { bullets.push({x: player.x-15, y: player.y-20}); bullets.push({x: player.x+15, y: player.y-20}); }
+        }
+
+        function spawnEnemy() {
+            if (Math.random() > 0.9) {
+                powerups.push({x: Math.random()*(canvas.width-40)+20, y: -50, type: Math.random()>0.5?'rapid':'shield'});
+            } else {
+                enemies.push({x: Math.random()*(canvas.width-60)+30, y: -50, size: 30+(Math.random()*10), speed: (2+Math.random()*3)*arcadeState.difficulty, cured: false});
+            }
+        }
+
+        function cureEnemy(e) {
+            e.cured = true; e.speed *= 1.5; arcadeState.score += 100;
+            spawnParticles(e.x, e.y, '#22c55e', 8);
+            spawnFloatingText(e.x, e.y, "CURED!");
+            document.getElementById('scoreDisplay').innerText = arcadeState.score;
+            playSound('cure');
+        }
+
+        function applyPowerup(type) {
+            playSound('powerup');
+            spawnFloatingText(player.x, player.y-40, type.toUpperCase()+"!", "#fbbf24");
+            if(type==='rapid') {
+                player.weaponLevel = 2;
+                document.getElementById('powerupStatus').style.opacity = 1;
+                setTimeout(() => { player.weaponLevel = 1; document.getElementById('powerupStatus').style.opacity = 0; }, 5000);
+            } else player.shield = true;
+        }
+
+        function playerHit() {
+            arcadeState.lives--;
+            document.getElementById('livesDisplay').innerText = '❤️'.repeat(Math.max(0, arcadeState.lives));
+            enemies = enemies.filter(e => dist(player.x, player.y, e.x, e.y) > 200); // Clear nearby
+            spawnParticles(player.x, player.y, '#ef4444', 20);
+            playSound('hit');
+            
+            // Shake
+            canvas.style.transform = `translate(${Math.random()*10-5}px, ${Math.random()*10-5}px)`;
+            setTimeout(()=>canvas.style.transform='none', 50);
+
+            if (arcadeState.lives <= 0) showGameOver();
+        }
+
+        function spawnParticles(x, y, color, count) {
+            for(let i=0;i<count;i++) particles.push({x,y,vx:(Math.random()-0.5)*10,vy:(Math.random()-0.5)*10,life:1,color});
+        }
+        function spawnFloatingText(x, y, text, color) { texts.push({x,y,text,life:1,color}); }
+
+        // --- Input Listeners ---
+        function handleMove(x, y) { input.x = x; input.y = y; input.active = true; }
+        canvas.addEventListener('touchstart', e => handleMove(e.touches[0].clientX, e.touches[0].clientY-50), {passive:false});
+        canvas.addEventListener('touchmove', e => { e.preventDefault(); handleMove(e.touches[0].clientX, e.touches[0].clientY-50); }, {passive:false});
+        canvas.addEventListener('mousedown', e => handleMove(e.clientX, e.clientY));
+        canvas.addEventListener('mousemove', e => { if(e.buttons===1) handleMove(e.clientX, e.clientY); });
+        window.addEventListener('mouseup', () => input.active = false);
+        window.addEventListener('touchend', () => input.active = false);
+
+
+        // --- FULL QUIZ MODE LOGIC ---
+
+        function startFullQuiz() {
+            appMode = 'quiz';
+            document.getElementById('mainMenu').classList.add('hidden');
+            document.getElementById('gameHUD').classList.add('hidden');
+            canvas.classList.add('hidden');
+            
+            // Setup Quiz
+            quizState.questions = [...ALL_QUESTIONS].sort(() => Math.random() - 0.5); // Shuffle
+            quizState.currentIdx = 0;
+            quizState.score = 0;
+
+            showQuizUI();
+            renderQuestion();
+        }
+
+        function showQuizUI() {
+            const modal = document.getElementById('universalModal');
+            modal.classList.remove('hidden');
+            document.getElementById('modalBadge').classList.remove('hidden');
+            document.getElementById('modalBadge').innerText = "📚 TRAINING MODE";
+            document.getElementById('modalBadge').className = "absolute -top-6 left-1/2 transform -translate-x-1/2 bg-blue-600 px-6 py-2 rounded-full font-bold shadow-lg border-2 border-white";
+            document.getElementById('modalTitle').innerText = "KNOWLEDGE CHECK";
+            document.getElementById('modalTitle').className = "mt-6 text-3xl font-bold mb-2 text-blue-400 arcade-text";
+            
+            document.getElementById('quizContainer').classList.remove('hidden');
+            document.getElementById('resultsContainer').classList.add('hidden');
+            document.getElementById('actionBtn').classList.add('hidden');
+        }
+
+        function renderQuestion() {
+            const q = quizState.questions[quizState.currentIdx];
+            document.getElementById('qIndex').innerText = quizState.currentIdx + 1;
+            document.getElementById('qTotal').innerText = quizState.questions.length;
+            
+            // Update progress bar
+            const pct = ((quizState.currentIdx) / quizState.questions.length) * 100;
+            document.getElementById('progressBar').style.width = `${pct}%`;
+
+            document.getElementById('quizQuestion').innerText = q.q;
+            
+            const optDiv = document.getElementById('quizOptions');
+            optDiv.innerHTML = '';
+            document.getElementById('quizFeedback').classList.add('hidden');
+            document.getElementById('actionBtn').classList.add('hidden');
+
+            q.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = "w-full text-left p-4 rounded-lg bg-gray-700 hover:bg-blue-600 font-bold transition border-2 border-gray-600";
+                btn.innerText = opt;
+                btn.onclick = () => checkAnswer(idx, q, btn);
+                optDiv.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(idx, q, btn) {
+            const feedback = document.getElementById('quizFeedback');
+            const actionBtn = document.getElementById('actionBtn');
+            const btns = document.getElementById('quizOptions').children;
+
+            for(let b of btns) b.disabled = true;
+
+            feedback.classList.remove('hidden');
+            feedback.innerText = q.info;
+            actionBtn.classList.remove('hidden');
+
+            if(idx === q.correct) {
+                btn.classList.add('bg-green-600', 'border-green-400');
+                feedback.classList.add('text-green-400', 'bg-gray-800');
+                feedback.classList.remove('text-red-400');
+                quizState.score++;
+            } else {
+                btn.classList.add('bg-red-600', 'border-red-400');
+                btns[q.correct].classList.add('bg-green-600');
+                feedback.classList.add('text-red-400', 'bg-gray-800');
+                feedback.classList.remove('text-green-400');
+            }
+
+            if (quizState.currentIdx < quizState.questions.length - 1) {
+                actionBtn.innerText = "NEXT QUESTION";
+                actionBtn.onclick = () => {
+                    quizState.currentIdx++;
+                    renderQuestion();
+                };
+            } else {
+                actionBtn.innerText = "FINISH TRAINING";
+                actionBtn.onclick = showQuizResults;
+            }
+        }
+
+        async function showQuizResults() {
+            document.getElementById('quizContainer').classList.add('hidden');
+            document.getElementById('resultsContainer').classList.remove('hidden');
+            document.getElementById('modalTitle').innerText = "TRAINING COMPLETE";
+            
+            const scoreText = `${quizState.score}/${quizState.questions.length}`;
+            document.getElementById('resultBigText').innerText = scoreText;
+            
+            let msg = "";
+            if (quizState.score === quizState.questions.length) msg = "PERFECT! You are a Rabies Expert!";
+            else if (quizState.score > quizState.questions.length/2) msg = "Great job! You know your stuff.";
+            else msg = "Good effort! Review the facts and try again.";
+            
+            // FIX: This line was crashing because the element didn't exist!
+            const msgEl = document.getElementById('resultMessage');
+            if (msgEl) msgEl.innerText = msg;
+
+            const btn = document.getElementById('actionBtn');
+            btn.innerText = "RETURN TO MENU";
+            btn.classList.remove('hidden');
+            btn.onclick = goHome;
+
+            // --- Trigger AI Debrief for Quiz too! ---
+            const debriefEl = document.getElementById('aiDebriefContent');
+            debriefEl.innerHTML = '<span class="animate-pulse">📡 Connecting to Vet Squad HQ for analysis...</span>';
+
+            const prompt = `
+                The player finished the Rabies Training Quiz.
+                Score: ${quizState.score}/${quizState.questions.length}.
+                Task: Give brief feedback. If score is low, tell them to study up on Rabies prevention. If high, tell them they are ready for the field.
+                Tone: Military/Medical Instructor.
+            `;
+
+            const report = await callGemini(prompt, "You are the Training Instructor for the Sarawak Vet Squad.");
+            
+            if (typeof marked !== 'undefined' && marked.parse) {
+                debriefEl.innerHTML = marked.parse(report);
+            } else {
+                debriefEl.innerText = report;
+            }
+        }
+
+        // --- GAME OVER (Arcade) ---
+
+        async function showGameOver() {
+            appMode = 'gameover';
+            const modal = document.getElementById('universalModal');
+            modal.classList.remove('hidden');
+            
+            document.getElementById('modalBadge').classList.remove('hidden');
+            document.getElementById('modalBadge').innerText = "⚠️ MISSION FAILED";
+            document.getElementById('modalBadge').className = "absolute -top-6 left-1/2 transform -translate-x-1/2 bg-red-600 px-6 py-2 rounded-full font-bold shadow-lg border-2 border-white";
+            
+            document.getElementById('modalTitle').innerText = "GAME OVER";
+            document.getElementById('modalTitle').className = "mt-6 text-3xl font-bold mb-2 text-red-500 arcade-text";
+
+            document.getElementById('quizContainer').classList.add('hidden');
+            document.getElementById('resultsContainer').classList.remove('hidden');
+            
+            document.getElementById('resultSubtitle').innerText = "FINAL SCORE";
+            document.getElementById('resultBigText').innerText = arcadeState.score;
+            
+            // Clear result message for game over style
+            const msgEl = document.getElementById('resultMessage');
+            if (msgEl) msgEl.innerText = "";
+
+            const btn = document.getElementById('actionBtn');
+            btn.innerText = "RETURN TO BASE";
+            btn.classList.remove('hidden');
+            btn.className = "w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl shadow-lg transition mt-4";
+            btn.onclick = goHome;
+
+            // --- GEMINI MISSION REPORT GENERATION ---
+            const debriefEl = document.getElementById('aiDebriefContent');
+            debriefEl.innerHTML = '<span class="animate-pulse">📡 Connecting to Vet Squad HQ for analysis...</span>';
+
+            const prompt = `
+                The player has finished a game of 'Sarawak Vet Squad'.
+                Their Score: ${arcadeState.score}.
+                Context: They are fighting a Rabies outbreak in Sarawak.
+                Task: Write a short, immersive, military-style mission debrief (max 2-3 sentences).
+                Tone: Serious but encouraging. If score is low (<500), tell them to train more. If high (>1500), praise them as a hero.
+                Include one very brief safety tip about Rabies (e.g. wash wounds, vaccinate dogs).
+            `;
+
+            const report = await callGemini(prompt, "You are the Commander of the Sarawak Vet Squad.");
+            
+            if (typeof marked !== 'undefined' && marked.parse) {
+                debriefEl.innerHTML = marked.parse(report);
+            } else {
+                debriefEl.innerText = report;
+            }
+        }
+
+        function goHome() {
+            document.getElementById('universalModal').classList.add('hidden');
+            document.getElementById('gameHUD').classList.add('hidden');
+            canvas.classList.add('hidden');
+            document.getElementById('mainMenu').classList.remove('hidden');
+            appMode = 'menu';
+        }
+
+        // --- DR DOGGY CHAT ---
+        function openDrDoggyChat() {
+            document.getElementById('chatModal').classList.remove('hidden');
+        }
+        
+        function closeChat() {
+            document.getElementById('chatModal').classList.add('hidden');
+        }
+
+        async function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const history = document.getElementById('chatHistory');
+            const text = input.value.trim();
+            
+            if (!text) return;
+
+            // User Bubble
+            const userDiv = document.createElement('div');
+            userDiv.className = 'user-bubble chat-bubble';
+            userDiv.innerText = text;
+            history.appendChild(userDiv);
+            
+            input.value = '';
+            history.scrollTop = history.scrollHeight;
+
+            // Loading Bubble
+            const loadDiv = document.createElement('div');
+            loadDiv.className = 'ai-bubble chat-bubble flex items-center gap-2';
+            loadDiv.innerHTML = '<div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div><div class="w-2 h-2 bg-gray-400 rounded-full typing-dot" style="animation-delay: 0.2s"></div><div class="w-2 h-2 bg-gray-400 rounded-full typing-dot" style="animation-delay: 0.4s"></div>';
+            history.appendChild(loadDiv);
+            history.scrollTop = history.scrollHeight;
+
+            // Call Gemini
+            const systemPrompt = `
+                You are Dr. Doggy, a friendly and expert veterinarian based in Sarawak, Malaysia.
+                Your goal is to educate people about Rabies prevention, dog health, and the 2017 outbreak context.
+                - Keep answers concise (max 2-3 sentences).
+                - Be friendly (use emoji like 🐕 💉).
+                - Emphasize the "15-minute washing rule" for bites.
+                - If asked about medical emergencies, ALWAYS tell them to go to a hospital immediately.
+            `;
+            
+            try {
+                const reply = await callGemini(text, systemPrompt);
+                
+                // Remove loader safely
+                if (loadDiv.parentNode) {
+                    loadDiv.parentNode.removeChild(loadDiv);
+                }
+
+                const aiDiv = document.createElement('div');
+                aiDiv.className = 'ai-bubble chat-bubble';
+                
+                // Handle missing marked library
+                if (typeof marked !== 'undefined' && marked.parse) {
+                    aiDiv.innerHTML = marked.parse(reply);
+                } else {
+                    aiDiv.innerText = reply;
+                }
+                
+                history.appendChild(aiDiv);
+            } catch (e) {
+                if (loadDiv.parentNode) loadDiv.parentNode.removeChild(loadDiv);
+                const errDiv = document.createElement('div');
+                errDiv.className = 'ai-bubble chat-bubble text-red-400';
+                errDiv.innerText = "System Error: " + e.message;
+                history.appendChild(errDiv);
+            }
+            
+            history.scrollTop = history.scrollHeight;
+        }
+
+        // --- Audio ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            if (type === 'shoot') {
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime+0.1);
+                gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+0.1);
+                osc.start(); osc.stop(audioCtx.currentTime+0.1);
+            } else if (type === 'cure') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(1200, audioCtx.currentTime+0.2);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime+0.2);
+                osc.start(); osc.stop(audioCtx.currentTime+0.2);
+            } else if (type === 'hit' || type === 'shield_break') {
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime+0.3);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime+0.3);
+                osc.start(); osc.stop(audioCtx.currentTime+0.3);
+            } else if (type === 'powerup') {
+                osc.type = 'square'; osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(600, audioCtx.currentTime+0.1);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime+0.3);
+                osc.start(); osc.stop(audioCtx.currentTime+0.3);
+            }
+        }
+    </script>
+</body>
+</html>
